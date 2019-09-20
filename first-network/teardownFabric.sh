@@ -11,9 +11,16 @@ set -e
 
 sleep 5
 
+# clearing old crypo files
+printf "clearing related cryptos"
+rm -rf ./crypto-config/
+rm -rf ./channel-artifacts/*.tx
+rm -rf ./channel-artifacts/*.block
+rm -rf ./channel-artifacts/*.json
+
 # remove docker containers
 printf "\n"
-printf "docker rm -f $(docker ps -aq)"
+printf "clearing containers"
 printf "\n\n"
 docker ps -aq
 if [ $? -ne 0 ]; then
@@ -44,8 +51,3 @@ printf "\n\n"
 docker network prune
 docker volume prune
 docker system prune
-
-
-
-
-clear cryptos!!!
