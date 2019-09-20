@@ -1,0 +1,229 @@
+# Copyright IBM Corp. All Rights Reserved.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+version: '3.2'
+
+volumes:
+  ca.example.com:
+  orderer0.example.com:
+  # orderer1.example.com:
+  peer0.org1.example.com:
+  peer1.org1.example.com:
+
+networks:
+  byfn:
+    # external: 
+    #   name: byfn
+
+services:
+  ca:
+    deploy:
+        replicas: 1
+        resources:
+          limits:
+            cpus: "0.1"
+            memory: 100M
+        restart_policy:
+            condition: on-failure
+            delay: 5s
+            max_attempts: 3
+        placement:
+            constraints:
+                - node.hostname == psq-Vostro-3546
+    image: hyperledger/fabric-ca:latest
+    environment:
+      - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
+      - FABRIC_CA_SERVER_CA_NAME=ca.example.com
+      - FABRIC_CA_SERVER_TLS_ENABLED=true
+      - FABRIC_CA_SERVER_TLS_CERTFILE=/etc/hyperledger/fabric-ca-server-config/ca.org1.example.com-cert.pem
+      - FABRIC_CA_SERVER_TLS_KEYFILE=/etc/hyperledger/fabric-ca-server-config/${BYFN_CA_PRIVATE_KEY}
+      # - FABRIC_CA_SERVER_TLS_KEYFILE=/etc/hyperledger/fabric-ca-server-config/4cf21d4f872cecc7b45e82444d20a61baff02c801fc2572b6ac8b70795eb488e_sk
+      - FABRIC_CA_SERVER_PORT=7054
+    ports:
+      - "7054:7054"
+    command: sh -c 'fabric-ca-server start --ca.certfile /etc/hyperledger/fabric-ca-server-config/ca.org1.example.com-cert.pem --ca.keyfile /etc/hyperledger/fabric-ca-server-config/${BYFN_CA_PRIVATE_KEY} -b admin:adminpw -d'
+    # command: sh -c 'fabric-ca-server start --ca.certfile /etc/hyperledger/fabric-ca-server-config/ca.org1.example.com-cert.pem --ca.keyfile /etc/hyperledger/fabric-ca-server-config/4cf21d4f872cecc7b45e82444d20a61baff02c801fc2572b6ac8b70795eb488e_sk -b admin:adminpw -d'
+    hostname: ca.example.com
+    volumes:
+      - ./crypto-config/peerOrganizations/org1.example.com/ca/:/etc/hyperledger/fabric-ca-server-config
+    # container_name: ca.example.com
+    networks:
+      - byfn
+
+  orderer0:
+    deploy:
+        replicas: 1
+        resources:
+          limits:
+            cpus: "0.1"
+            memory: 200M
+        restart_policy:
+            condition: on-failure
+            delay: 5s
+            max_attempts: 3
+        placement:
+            constraints:
+                - node.hostname == psq-Vostro-3546
+    image: hyperledger/fabric-orderer:latest
+    environment:
+      # - FABRIC_LOGGING_SPEC=DEBUG
+      - FABRIC_LOGGING_SPEC=INFO
+      - ORDERER_GENERAL_LISTENADDRESS=0.0.0.0
+      - ORDERER_GENERAL_GENESISMETHOD=file
+      - ORDERER_GENERAL_GENESISFILE=/peer/var/hyperledger/orderer/orderer.genesis.block
+      - ORDERER_GENERAL_LOCALMSPID=OrdererMSP
+      - ORDERER_GENERAL_LOCALMSPDIR=/peer/var/hyperledger/orderer/msp
+      # enabled TLS
+      - ORDERER_GENERAL_TLS_ENABLED=true
+      - ORDERER_GENERAL_TLS_PRIVATEKEY=/peer/var/hyperledger/orderer/tls/server.key
+      - ORDERER_GENERAL_TLS_CERTIFICATE=/peer/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_GENERAL_TLS_ROOTCAS=[/peer/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_KAFKA_TOPIC_REPLICATIONFACTOR=1
+      - ORDERER_KAFKA_VERBOSE=true
+      - ORDERER_GENERAL_CLUSTER_CLIENTCERTIFICATE=/peer/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_GENERAL_CLUSTER_CLIENTPRIVATEKEY=/peer/var/hyperledger/orderer/tls/server.key
+      - ORDERER_GENERAL_CLUSTER_ROOTCAS=[/peer/var/hyperledger/orderer/tls/ca.crt]
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric
+    hostname: orderer0.example.com
+    ports:
+      - 7050:7050
+    command: orderer
+    volumes:
+        - ./channel-artifacts/genesis.block:/peer/var/hyperledger/orderer/orderer.genesis.block
+        - ./crypto-config/ordererOrganizations/example.com/orderers/orderer0.example.com/msp:/peer/var/hyperledger/orderer/msp
+        - ./crypto-config/ordererOrganizations/example.com/orderers/orderer0.example.com/tls/:/peer/var/hyperledger/orderer/tls
+        - orderer0.example.com:/peer/var/hyperledger/production/orderer
+    # container_name: orderer0.example.com
+    networks:
+      byfn:
+        aliases:
+          - orderer0.example.com
+
+  # orderer1.example.com:
+  #   extends:
+  #     file:   base/docker-compose-base.yaml
+  #     service: orderer1.example.com
+  #   container_name: orderer1.example.com
+  #   networks:
+  #     - byfn
+
+  peer0_org1:
+    deploy:
+        replicas: 1
+        resources:
+          limits:
+            cpus: "0.1"
+            memory: 100M
+        restart_policy:
+            condition: on-failure
+            delay: 5s
+            max_attempts: 3
+        placement:
+            constraints:
+                - node.hostname == psq-Vostro-3546
+    # container_name: peer0.org1.example.com
+    image: hyperledger/fabric-peer:latest
+    environment:
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      # the following setting starts chaincode containers on the same
+      # bridge network as the peers
+      # https://docs.docker.com/compose/networking/
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=${COMPOSE_PROJECT_NAME}_byfn
+      - FABRIC_LOGGING_SPEC=INFO
+      # - FABRIC_LOGGING_SPEC=DEBUG
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_GOSSIP_USELEADERELECTION=true
+      - CORE_PEER_GOSSIP_ORGLEADER=false
+      - CORE_PEER_PROFILE_ENABLED=true
+      - CORE_PEER_TLS_CERT_FILE=/peer/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/peer/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/peer/etc/hyperledger/fabric/tls/ca.crt
+      # - CORE_PEER_TLS_ROOTCERT_FILE=/peer/crypto/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt
+      - CORE_PEER_ID=peer0.org1.example.com
+      - CORE_PEER_ADDRESS=peer0.org1.example.com:7051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:7051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.org1.example.com:7052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer1.org1.example.com:8051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.org1.example.com:7051
+      - CORE_PEER_LOCALMSPID=Org1MSP
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
+    ports:
+      - 7051:7051
+    command: peer node start
+    hostname: peer0.org1.example.com
+    volumes:
+        - /var/run/:/host/var/run/
+        - ./crypto-config/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/msp:/peer/etc/hyperledger/fabric/msp
+        - ./crypto-config/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls:/peer/etc/hyperledger/fabric/tls
+        - peer0.org1.example.com:/var/hyperledger/production
+    networks:
+      byfn:
+        aliases:
+          - peer0.org1.example.com
+
+  peer1_org1:
+    deploy:
+        replicas: 1
+        resources:
+          limits:
+            cpus: "0.1"
+            memory: 100M
+        restart_policy:
+            condition: on-failure
+            delay: 5s
+            max_attempts: 3
+        placement:
+            constraints:
+                - node.hostname == psq-Vostro-3546
+    # container_name: peer1.org1.example.com
+    image: hyperledger/fabric-peer:latest
+    environment:
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      # the following setting starts chaincode containers on the same
+      # bridge network as the peers
+      # https://docs.docker.com/compose/networking/
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=${COMPOSE_PROJECT_NAME}_byfn
+      - FABRIC_LOGGING_SPEC=INFO
+      # - FABRIC_LOGGING_SPEC=DEBUG
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_GOSSIP_USELEADERELECTION=true
+      - CORE_PEER_GOSSIP_ORGLEADER=false
+      - CORE_PEER_PROFILE_ENABLED=true
+      - CORE_PEER_TLS_CERT_FILE=/peer/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/peer/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/peer/etc/hyperledger/fabric/tls/ca.crt
+      # - CORE_PEER_TLS_ROOTCERT_FILE=/peer/crypto/peerOrganizations/org1.example.com/peers/peer1.org1.example.com/tls/ca.crt
+      - CORE_PEER_ID=peer1.org1.example.com
+      - CORE_PEER_ADDRESS=peer1.org1.example.com:8051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:8051
+      - CORE_PEER_CHAINCODEADDRESS=peer1.org1.example.com:8052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:8052
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer1.org1.example.com:8051
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.org1.example.com:7051
+      - CORE_PEER_GOSSIP_ENDPOINT=peer0.org1.example.com:7051
+      - CORE_PEER_LOCALMSPID=Org1MSP
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
+    ports:
+      - 8051:8051
+    command: peer node start
+    hostname: peer1.org1.example.com
+    volumes:
+        - /var/run/:/host/var/run/
+        - ./crypto-config/peerOrganizations/org1.example.com/peers/peer1.org1.example.com/msp:/peer/etc/hyperledger/fabric/msp
+        - ./crypto-config/peerOrganizations/org1.example.com/peers/peer1.org1.example.com/tls:/peer/etc/hyperledger/fabric/tls
+        - peer1.org1.example.com:/peer/var/hyperledger/production
+    networks:
+      byfn:
+        aliases:
+          - peer1.org1.example.com
+
+  # peer1.org1.example.com:
+  #   container_name: peer1.org1.example.com
+  #   extends:
+  #     file:  base/docker-compose-base.yaml
+  #     service: peer1.org1.example.com
+  #   networks:
+  #     - byfn
