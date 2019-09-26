@@ -29,7 +29,7 @@ services:
             max_attempts: 3
         placement:
             constraints:
-                - node.hostname == psq-Vostro-3653
+                - node.hostname == psq-Vostro-3546
     # container_name: peer0.org2.example.com
     image: hyperledger/fabric-peer:latest
     environment:
@@ -37,7 +37,7 @@ services:
       # the following setting starts chaincode containers on the same
       # bridge network as the peers
       # https://docs.docker.com/compose/networking/
-      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=${COMPOSE_PROJECT_NAME}_byfn
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=byfn
       - FABRIC_LOGGING_SPEC=INFO
       # - FABRIC_LOGGING_SPEC=DEBUG
       - CORE_PEER_TLS_ENABLED=true
@@ -55,6 +55,7 @@ services:
       - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:9052
       - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.org2.example.com:9051
       - CORE_PEER_GOSSIP_BOOTSTRAP=peer1.org2.example.com:10051
+      - CORE_PEER_GOSSIP_ENDPOINT=peer1.org2.example.com:10051
       - CORE_PEER_LOCALMSPID=Org2MSP
     working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
     ports:
@@ -84,7 +85,7 @@ services:
             max_attempts: 3
         placement:
             constraints:
-                - node.hostname == psq-Vostro-3653
+                - node.hostname == psq-Vostro-3546
     # container_name: peer1.org2.example.com
     image: hyperledger/fabric-peer:latest
     environment:
@@ -92,7 +93,7 @@ services:
       # the following setting starts chaincode containers on the same
       # bridge network as the peers
       # https://docs.docker.com/compose/networking/
-      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=${COMPOSE_PROJECT_NAME}_byfn
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=byfn
       - FABRIC_LOGGING_SPEC=INFO
       # - FABRIC_LOGGING_SPEC=DEBUG
       - CORE_PEER_TLS_ENABLED=true
@@ -137,7 +138,7 @@ services:
             max_attempts: 3
         placement:
             constraints:
-                - node.hostname == psq-Vostro-3653
+                - node.hostname == psq-Vostro-3546
     # container_name: cli
     image: hyperledger/fabric-tools:latest
     tty: true
